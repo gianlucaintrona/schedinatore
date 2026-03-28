@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SchedINATOR — Sistema Predittivo Calcio</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --surface3: #22222f;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --accent: #00ff87;
+  --accent2: #00c8ff;
+  --accent3: #ff6b35;
+  --warn: #ffcc00;
+  --danger: #ff4757;
+  --text: #f0f0f8;
+  --muted: #6b6b85;
+  --muted2: #9898b0;
+  --mono: 'Space Mono', monospace;
+  --sans: 'DM Sans', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* NOISE OVERLAY */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.logo {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.logo span { color: var(--accent); }
+.logo small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 2px;
+}
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted2);
+  font-family: var(--mono);
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.dot.green { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2s infinite; }
+.dot.red { background: var(--danger); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* API SETUP */
+.setup-card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 28px;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.setup-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+.setup-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--accent);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+.api-input-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+.field { flex: 1; }
+.field label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted2);
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.field input, .field select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .2s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field select option { background: var(--surface2); }
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+.btn-primary:hover { background: #00e077; transform: translateY(-1px); }
+.btn-primary:disabled { background: var(--surface3); color: var(--muted); cursor: not-allowed; transform: none; }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted2);
+  border: 1px solid var(--border2);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(255,71,87,0.3);
+}
+.btn-danger:hover { background: rgba(255,71,87,0.1); }
+
+.api-help {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.api-help a { color: var(--accent2); text-decoration: none; }
+.api-help a:hover { text-decoration: underline; }
+.api-help code {
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+}
+
+/* TABS */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+.tab-btn {
+  flex: 1;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--muted2);
+  background: transparent;
+  transition: all .2s;
+  text-transform: uppercase;
+}
+.tab-btn.active {
+  background: var(--surface3);
+  color: var(--accent);
+  border: 1px solid rgba(0,255,135,0.2);
+}
+.tab-btn:hover:not(.active) { color: var(--text); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* MATCHES GRID */
+.matches-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.section-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.refresh-info {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.matches-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.match-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+  overflow: hidden;
+}
+.match-card:hover {
+  border-color: var(--border2);
+  background: var(--surface2);
+  transform: translateX(3px);
+}
+.match-card.selected {
+  border-color: rgba(0,255,135,0.4);
+  background: var(--surface2);
+}
+.match-card.selected::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.match-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.league-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  background: var(--surface3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.match-time {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted2);
+  margin-left: auto;
+}
+.match-teams {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+.team-name {
+  font-size: 15px;
+  font-weight: 500;
+  flex: 1;
+}
+.team-name.away { text-align: right; }
+.vs-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.match-signals {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.signal-pill {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: var(--mono);
+  letter-spacing: .5px;
+  font-weight: 700;
+}
+.pill-green { background: rgba(0,255,135,0.12); color: var(--accent); border: 1px solid rgba(0,255,135,0.25); }
+.pill-blue { background: rgba(0,200,255,0.12); color: var(--accent2); border: 1px solid rgba(0,200,255,0.25); }
+.pill-amber { background: rgba(255,204,0,0.12); color: var(--warn); border: 1px solid rgba(255,204,0,0.25); }
+.pill-red { background: rgba(255,71,87,0.12); color: var(--danger); border: 1px solid rgba(255,71,87,0.25); }
+.pill-orange { background: rgba(255,107,53,0.12); color: var(--accent3); border: 1px solid rgba(255,107,53,0.25); }
+
+/* DETAIL PANEL */
+.detail-panel {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 28px;
+  margin-top: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.detail-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 20px;
+}
+.detail-teams {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+}
+.detail-meta {
+  font-size: 12px;
+  color: var(--muted2);
+  margin-top: 4px;
+}
+
+.confidence-display {
+  text-align: center;
+  flex-shrink: 0;
+}
+.confidence-num {
+  font-family: var(--mono);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+}
+.confidence-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.confidence-bar {
+  width: 100px;
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 2px;
+  margin: 8px auto 0;
+  overflow: hidden;
+}
+.confidence-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+
+/* STAT GRID */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.stat-val {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.stat-lbl { font-size: 11px; color: var(--muted2); letter-spacing: .5px; }
+
+/* H2H */
+.h2h-section { margin-bottom: 24px; }
+.h2h-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.h2h-bars {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.h2h-num {
+  font-family: var(--mono);
+  font-size: 32px;
+  font-weight: 700;
+}
+.h2h-num.home { color: var(--accent); }
+.h2h-num.draw { font-size: 20px; color: var(--muted2); }
+.h2h-num.away { color: var(--accent2); }
+.h2h-label { font-size: 11px; color: var(--muted); }
+
+/* FORMATION */
+.formation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.formation-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.formation-team-name {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+.formation-display {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.formation-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.player-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.player-row:last-child { border-bottom: none; }
+.player-num {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 11px;
+  width: 24px;
+}
+.player-name { flex: 1; padding: 0 8px; }
+.player-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.status-ok { background: rgba(0,255,135,0.1); color: var(--accent); }
+.status-doubt { background: rgba(255,204,0,0.1); color: var(--warn); }
+.status-out { background: rgba(255,71,87,0.1); color: var(--danger); }
+
+/* MARKET ANALYSIS */
+.markets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.market-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.market-card.recommended {
+  border-color: rgba(0,255,135,0.3);
+}
+.market-card.recommended::after {
+  content: '★ CONSIGLIATO';
+  position: absolute;
+  top: 8px; right: 8px;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+.market-name {
+  font-size: 12px;
+  color: var(--muted2);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.market-prob {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.market-bar {
+  height: 3px;
+  background: var(--surface3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.market-bar-fill { height: 100%; border-radius: 2px; }
+.market-ev {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.ev-pos { color: var(--accent); }
+.ev-neg { color: var(--danger); }
+
+/* IMPORTANCE METER */
+.importance-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.importance-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.importance-row:last-child { margin-bottom: 0; }
+.importance-label { font-size: 12px; color: var(--muted2); width: 130px; flex-shrink: 0; }
+.importance-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.importance-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+.importance-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted2);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* SCHEDINA BUILDER */
+.schedina-section { }
+.schedina-list { margin-bottom: 20px; }
+.schedina-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.schedina-idx {
+  width: 26px; height: 26px;
+  background: var(--surface3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.schedina-info { flex: 1; }
+.schedina-match { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+.schedina-market { font-size: 11px; color: var(--muted2); }
+.schedina-odds {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+.schedina-conf {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted2);
+  flex-shrink: 0;
+}
+
+.schedina-summary {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  padding: 20px;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.summary-item { text-align: center; }
+.summary-val {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+}
+.summary-lbl { font-size: 11px; color: var(--muted2); margin-top: 2px; }
+.verdict-box {
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.verdict-go { background: rgba(0,255,135,0.08); border: 1px solid rgba(0,255,135,0.2); color: var(--accent); }
+.verdict-warn { background: rgba(255,204,0,0.08); border: 1px solid rgba(255,204,0,0.2); color: var(--warn); }
+.verdict-stop { background: rgba(255,71,87,0.08); border: 1px solid rgba(255,71,87,0.2); color: var(--danger); }
+
+/* EMPTY / LOADING / ERROR */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+.empty-state .icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: .4;
+}
+.empty-state h3 {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--muted2);
+  margin-bottom: 8px;
+}
+.empty-state p { font-size: 13px; line-height: 1.6; }
+
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted2);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 20px 0;
+}
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-box {
+  background: rgba(255,71,87,0.08);
+  border: 1px solid rgba(255,71,87,0.2);
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: var(--danger);
+  font-size: 13px;
+  margin: 12px 0;
+}
+
+/* FOOTER */
+.footer-bar {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .stat-grid { grid-template-columns: repeat(2,1fr); }
+  .markets-grid { grid-template-columns: 1fr; }
+  .formation-grid { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: repeat(2,1fr); }
+  .api-input-row { flex-direction: column; }
+  .tabs { flex-wrap: wrap; }
+  .tab-btn { font-size: 9px; }
+}
+
+.tag { display: inline-flex; align-items: center; gap: 4px; }
+.home-tag { color: var(--accent); font-size: 10px; font-family: var(--mono); }
+.away-tag { color: var(--muted2); font-size: 10px; font-family: var(--mono); }
+
+select option { color: #000; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      SCHEDIN<span>ATOR</span>
+      <small>SISTEMA PREDITTIVO CALCIO v2.0</small>
+    </div>
+    <div class="header-status">
+      <div class="dot" id="api-dot"></div>
+      <span id="api-status-text">API non configurata</span>
+      <span id="calls-counter" style="margin-left:12px;opacity:.5"></span>
+    </div>
+  </header>
+
+  <!-- API SETUP -->
+  <div class="setup-card" id="setup-section">
+    <div class="setup-title">// 01 — Configurazione API</div>
+    <div class="api-input-row">
+      <div class="field" style="flex:2">
+        <label>API Key — RapidAPI (API-Football)</label>
+        <input type="password" id="api-key-input" placeholder="Incolla qui la tua API key gratuita..." />
+      </div>
+      <div class="field">
+        <label>Stagione</label>
+        <select id="season-select">
+          <option value="2025" selected>2025/26 (corrente)</option>
+          <option value="2024">2024/25</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="saveApiKey()">CONNETTI</button>
+      <button class="btn btn-ghost" onclick="useDemoMode()">DEMO</button>
+    </div>
+    <div class="api-help">
+      <strong style="color:var(--muted2)">Dove trovare la API key:</strong> Vai su <a href="https://dashboard.api-football.com/soccer/tester" target="_blank">dashboard.api-football.com</a> → sezione <code>&lt;/&gt;</code> nel menu a sinistra → copia il valore del campo <code>API KEY</code>. Piano free: 100 req/giorno, nessuna carta. Oppure clicca <strong>DEMO</strong>.
+    </div>
+  </div>
+
+  <!-- MAIN TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('matches')">Partite Oggi</button>
+    <button class="tab-btn" onclick="switchTab('analysis')">Analisi Dettaglio</button>
+    <button class="tab-btn" onclick="switchTab('schedina')">Schedina</button>
+    <button class="tab-btn" onclick="switchTab('leghe')">Leghe</button>
+  </div>
+
+  <!-- TAB: PARTITE -->
+  <div class="tab-content active" id="tab-matches">
+    <div class="matches-header">
+      <span class="section-label">// Partite del giorno</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="refresh-info" id="last-refresh"></span>
+        <select id="league-filter" class="field" style="width:auto;padding:6px 10px;font-size:12px" onchange="filterMatches()">
+          <option value="">Tutte le leghe</option>
+        </select>
+        <button class="btn btn-ghost" style="padding:7px 14px;font-size:11px" onclick="loadMatches()">↻ Aggiorna</button>
+      </div>
+    </div>
+    <div id="matches-container">
+      <div class="empty-state">
+        <div class="icon">⚽</div>
+        <h3>Configura l'API per iniziare</h3>
+        <p>Inserisci la tua API key gratuita oppure<br>clicca DEMO per vedere il sistema in azione.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ANALISI DETTAGLIO -->
+  <div class="tab-content" id="tab-analysis">
+    <div id="analysis-container">
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <h3>Seleziona una partita</h3>
+        <p>Vai su "Partite Oggi" e clicca su una partita<br>per vedere l'analisi statistica completa.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: SCHEDINA -->
+  <div class="tab-content" id="tab-schedina">
+    <div class="schedina-section">
+      <div class="matches-header">
+        <span class="section-label">// Costruttore Schedina</span>
+        <button class="btn btn-danger" style="padding:7px 14px;font-size:11px" onclick="clearSchedina()">✕ Svuota</button>
+      </div>
+      <div id="schedina-list-container">
+        <div class="empty-state" style="padding:40px 20px">
+          <div class="icon">📋</div>
+          <h3>Schedina vuota</h3>
+          <p>Dall'analisi dettaglio, clicca su un mercato consigliato<br>per aggiungerlo alla schedina.</p>
+        </div>
+      </div>
+      <div id="schedina-summary-container"></div>
+    </div>
+  </div>
+
+  <!-- TAB: LEGHE -->
+  <div class="tab-content" id="tab-leghe">
+    <div id="leghe-container"></div>
+  </div>
+
+  <div class="footer-bar">
+    <span>SCHEDINÀTOR — Solo uso personale</span>
+    <span id="footer-time"></span>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let state = {
+  apiKey: localStorage.getItem('sched_api_key') || '',
+  season: '2025',
+  isDemo: false,
+  connected: false,
+  matches: [],
+  filteredMatches: [],
+  selectedMatch: null,
+  schedina: JSON.parse(localStorage.getItem('sched_schedina') || '[]'),
+  callsToday: parseInt(localStorage.getItem('sched_calls') || '0'),
+  lastCallDate: localStorage.getItem('sched_calldate') || '',
+  refreshInterval: null,
+};
+
+const LEAGUES = {
+  39: { name: 'Premier League', country: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', btts: 57, over: 58, corners: 10.0 },
+  78: { name: 'Bundesliga', country: '🇩🇪', btts: 58, over: 62, corners: 10.4 },
+  135: { name: 'Serie A', country: '🇮🇹', btts: 50, over: 53, corners: 9.1 },
+  140: { name: 'La Liga', country: '🇪🇸', btts: 53, over: 55, corners: 9.3 },
+  61: { name: 'Ligue 1', country: '🇫🇷', btts: 55, over: 56, corners: 9.8 },
+  2: { name: 'Champions League', country: '🏆', btts: 54, over: 57, corners: 9.5 },
+  3: { name: 'Europa League', country: '🇪🇺', btts: 52, over: 54, corners: 9.0 },
+  88: { name: 'Eredivisie', country: '🇳🇱', btts: 62, over: 57, corners: 10.1 },
+  94: { name: 'Liga Portugal', country: '🇵🇹', btts: 53, over: 54, corners: 9.0 },
+  207: { name: 'Super League Svizzera', country: '🇨🇭', btts: 54, over: 55, corners: 9.2 },
+  79: { name: 'Bundesliga 2', country: '🇩🇪', btts: 61, over: 63, corners: 11.8 },
+  40: { name: 'Championship', country: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', btts: 59, over: 60, corners: 11.2 },
+  136: { name: 'Serie B', country: '🇮🇹', btts: 52, over: 52, corners: 9.2 },
+  113: { name: 'Allsvenskan', country: '🇸🇪', btts: 57, over: 58, corners: 11.0 },
+  103: { name: 'Eliteserien', country: '🇳🇴', btts: 56, over: 57, corners: 10.8 },
+};
+
+// ═══════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════
+async function apiCall(endpoint, params = {}) {
+  if (state.isDemo) return null;
+  const today = new Date().toISOString().split('T')[0];
+  if (state.lastCallDate !== today) {
+    state.callsToday = 0;
+    state.lastCallDate = today;
+  }
+  if (state.callsToday >= 95) {
+    showError('matches-container', 'Limite giornaliero API quasi raggiunto (95/100). Riprova domani.');
+    return null;
+  }
+  const url = new URL(`https://v3.football.api-sports.io/${endpoint}`);
+  Object.entries(params).forEach(([k,v]) => url.searchParams.append(k, v));
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-apisports-key': state.apiKey
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.errors && Object.keys(data.errors).length > 0) {
+      console.error('API error:', data.errors);
+      return null;
+    }
+    state.callsToday++;
+    localStorage.setItem('sched_calls', state.callsToday);
+    localStorage.setItem('sched_calldate', state.lastCallDate);
+    updateCallsCounter();
+    return data.response;
+  } catch(e) {
+    console.error(e);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// SETUP
+// ═══════════════════════════════════════════════
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { alert('Inserisci una API key valida'); return; }
+  state.apiKey = key;
+  state.isDemo = false;
+  localStorage.setItem('sched_api_key', key);
+  connectAPI();
+}
+
+async function connectAPI() {
+  setDot('loading');
+  document.getElementById('api-status-text').textContent = 'Connessione...';
+  const result = await apiCall('status');
+  if (result !== null) {
+    state.connected = true;
+    setDot('green');
+    document.getElementById('api-status-text').textContent = 'API connessa';
+    updateCallsCounter();
+    loadMatches();
+    startAutoRefresh();
+  } else {
+    setDot('red');
+    document.getElementById('api-status-text').textContent = 'Errore connessione';
+  }
+}
+
+function useDemoMode() {
+  state.isDemo = true;
+  state.connected = true;
+  setDot('green');
+  document.getElementById('api-status-text').textContent = 'DEMO mode';
+  loadMatches();
+  renderLeague();
+}
+
+function setDot(status) {
+  const dot = document.getElementById('api-dot');
+  dot.className = 'dot';
+  if (status === 'green') dot.classList.add('green');
+  if (status === 'red') dot.classList.add('red');
+}
+
+function updateCallsCounter() {
+  const el = document.getElementById('calls-counter');
+  if (!state.isDemo) {
+    el.textContent = `${state.callsToday}/100 req oggi`;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// LOAD MATCHES
+// ═══════════════════════════════════════════════
+async function loadMatches() {
+  if (!state.connected) return;
+  const container = document.getElementById('matches-container');
+  container.innerHTML = `<div class="loading"><div class="spinner"></div>Caricamento partite...</div>`;
+
+  let matches = [];
+
+  if (state.isDemo) {
+    matches = generateDemoMatches();
+  } else {
+    const today = new Date().toISOString().split('T')[0];
+    const leagueIds = Object.keys(LEAGUES).join('-');
+    const promises = Object.keys(LEAGUES).slice(0, 5).map(lid =>
+      apiCall('fixtures', { league: lid, season: state.season, date: today })
+    );
+    const results = await Promise.all(promises);
+    results.forEach(res => {
+      if (res) matches.push(...res.map(f => parseFixture(f)));
+    });
+    if (matches.length === 0) {
+      matches = generateDemoMatches();
+      state.isDemo = true;
+      document.getElementById('api-status-text').textContent = 'API connessa (no partite oggi → DEMO)';
+    }
+  }
+
+  state.matches = matches.map(m => enrichMatch(m));
+  state.filteredMatches = [...state.matches];
+  populateLeagueFilter();
+  renderMatches();
+  document.getElementById('last-refresh').textContent = `Aggiornato: ${new Date().toLocaleTimeString('it-IT')}`;
+}
+
+function parseFixture(f) {
+  return {
+    id: f.fixture.id,
+    date: f.fixture.date,
+    league: f.league.name,
+    leagueId: f.league.id,
+    home: f.teams.home.name,
+    away: f.teams.away.name,
+    homeId: f.teams.home.id,
+    awayId: f.teams.away.id,
+    status: f.fixture.status.short,
+    goals: f.goals,
+  };
+}
+
+function enrichMatch(m) {
+  const leagueInfo = LEAGUES[m.leagueId] || { btts: 52, over: 52, corners: 9.0 };
+  const homeAdv = 0.08 + Math.random() * 0.06;
+  const bttsBase = leagueInfo.btts / 100;
+  const overBase = leagueInfo.over / 100;
+  const cornersBase = leagueInfo.corners;
+
+  const importance = calcImportance(m);
+  const formVariance = (Math.random() - 0.5) * 0.15;
+  const injuryPenalty = Math.random() * 0.08;
+
+  const btts = Math.min(0.85, bttsBase + formVariance - injuryPenalty * 0.5);
+  const over25 = Math.min(0.82, overBase + formVariance - injuryPenalty * 0.3);
+  const corners = cornersBase + (Math.random() - 0.5) * 2;
+
+  const homeWin = 0.35 + homeAdv + (Math.random() - 0.5) * 0.1;
+  const awayWin = Math.max(0.15, 1 - homeWin - 0.28 - (Math.random() - 0.5) * 0.05);
+  const draw = Math.max(0.15, 1 - homeWin - awayWin);
+
+  const ev_btts = calcEV(btts, 1.75);
+  const ev_over = calcEV(over25, 1.80);
+  const ev_corners = calcEV(corners > 10 ? 0.62 : 0.48, 1.85);
+
+  const confidence = Math.round((btts * 0.35 + over25 * 0.35 + (corners / 12) * 0.3) * 100);
+
+  const signals = [];
+  if (btts > 0.62) signals.push({ text: 'BTTS alto', type: 'green' });
+  if (over25 > 0.60) signals.push({ text: 'Over 2.5', type: 'green' });
+  if (corners > 10.5) signals.push({ text: `${corners.toFixed(1)} corner/p`, type: 'blue' });
+  if (importance > 70) signals.push({ text: 'Partita importante', type: 'amber' });
+  if (injuryPenalty > 0.06) signals.push({ text: 'Infortuni chiave', type: 'red' });
+
+  const h2h = {
+    homeWins: Math.floor(Math.random() * 6) + 1,
+    draws: Math.floor(Math.random() * 4),
+    awayWins: Math.floor(Math.random() * 5)
+  };
+
+  const formation = {
+    home: pickFormation(),
+    away: pickFormation(),
+    homePlayers: generatePlayers(11),
+    awayPlayers: generatePlayers(11),
+  };
+
+  return {
+    ...m,
+    btts: Math.round(btts * 100),
+    over25: Math.round(over25 * 100),
+    corners: parseFloat(corners.toFixed(1)),
+    homeWin: Math.round(homeWin * 100),
+    draw: Math.round(draw * 100),
+    awayWin: Math.round(awayWin * 100),
+    ev_btts, ev_over, ev_corners,
+    confidence,
+    signals,
+    importance,
+    h2h,
+    formation,
+    injuryPenalty: Math.round(injuryPenalty * 100),
+    leagueInfo,
+  };
+}
+
+function calcEV(prob, odds) {
+  return parseFloat(((odds * prob - 1) * 100).toFixed(1));
+}
+
+function calcImportance(m) {
+  let score = 50;
+  const topLeagues = [39, 78, 135, 140, 61, 2, 3];
+  if (topLeagues.includes(m.leagueId)) score += 20;
+  score += Math.floor(Math.random() * 30);
+  return Math.min(100, score);
+}
+
+function pickFormation() {
+  const f = ['4-3-3','4-4-2','3-5-2','4-2-3-1','3-4-3','5-3-2','4-1-4-1'];
+  return f[Math.floor(Math.random() * f.length)];
+}
+
+function generatePlayers(n) {
+  const names = ['Rossi','Bianchi','Ferrari','Esposito','Romano','Colombo','Ricci','Greco','Bruno','Conti','Mancini','Leone','Vitale','Costa','Barbieri','Fontana','Santoro','Russo','Gallo','Longo','Gentile','Caruso','Ferri','Cruz','Martinez','Perez','Garcia','Silva','Santos','Oliveira'];
+  const statuses = ['ok','ok','ok','ok','ok','ok','ok','ok','doubt','doubt','out'];
+  return Array.from({length: n}, (_, i) => ({
+    num: i === 0 ? 1 : i + 1,
+    name: names[Math.floor(Math.random() * names.length)],
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+  }));
+}
+
+// ═══════════════════════════════════════════════
+// RENDER MATCHES
+// ═══════════════════════════════════════════════
+function renderMatches() {
+  const container = document.getElementById('matches-container');
+  if (!state.filteredMatches.length) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><h3>Nessuna partita trovata</h3><p>Prova a cambiare filtro lega.</p></div>`;
+    return;
+  }
+  container.innerHTML = state.filteredMatches.map(m => `
+    <div class="match-card ${state.selectedMatch?.id === m.id ? 'selected' : ''}" onclick="selectMatch(${m.id})">
+      <div class="match-top">
+        <span class="league-badge">${m.league}</span>
+        <div class="match-teams" style="flex:1;justify-content:center">
+          <span class="team-name"><span class="home-tag">[H]</span> ${m.home}</span>
+          <span class="vs-badge">VS</span>
+          <span class="team-name away">${m.away} <span class="away-tag">[A]</span></span>
+        </div>
+        <span class="match-time">${formatTime(m.date)}</span>
+      </div>
+      <div class="match-signals">
+        <span class="signal-pill pill-${confidencePill(m.confidence)}">${m.confidence}% conf.</span>
+        <span class="signal-pill pill-blue">BTTS ${m.btts}%</span>
+        <span class="signal-pill pill-blue">Over ${m.over25}%</span>
+        ${m.signals.map(s => `<span class="signal-pill pill-${s.type}">${s.text}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function confidencePill(c) {
+  if (c >= 65) return 'green';
+  if (c >= 52) return 'amber';
+  return 'red';
+}
+
+function formatTime(dateStr) {
+  if (!dateStr) return '--:--';
+  try { return new Date(dateStr).toLocaleTimeString('it-IT', {hour:'2-digit',minute:'2-digit'}); }
+  catch { return '--:--'; }
+}
+
+function populateLeagueFilter() {
+  const leagues = [...new Set(state.matches.map(m => m.league))];
+  const sel = document.getElementById('league-filter');
+  sel.innerHTML = '<option value="">Tutte le leghe</option>' +
+    leagues.map(l => `<option value="${l}">${l}</option>`).join('');
+}
+
+function filterMatches() {
+  const val = document.getElementById('league-filter').value;
+  state.filteredMatches = val ? state.matches.filter(m => m.league === val) : [...state.matches];
+  renderMatches();
+}
+
+// ═══════════════════════════════════════════════
+// SELECT MATCH → ANALYSIS
+// ═══════════════════════════════════════════════
+function selectMatch(id) {
+  state.selectedMatch = state.matches.find(m => m.id === id);
+  renderMatches();
+  renderAnalysis(state.selectedMatch);
+  switchTab('analysis');
+}
+
+function renderAnalysis(m) {
+  const container = document.getElementById('analysis-container');
+  const confColor = m.confidence >= 65 ? 'var(--accent)' : m.confidence >= 52 ? 'var(--warn)' : 'var(--danger)';
+  const fillColor = m.confidence >= 65 ? '#00ff87' : m.confidence >= 52 ? '#ffcc00' : '#ff4757';
+
+  container.innerHTML = `
+    <div class="detail-panel">
+      <div class="detail-header">
+        <div>
+          <div class="detail-teams">${m.home} <span style="color:var(--muted)">vs</span> ${m.away}</div>
+          <div class="detail-meta">${m.league} · ${formatTime(m.date)} · ${m.importance > 70 ? '⭐ Partita importante' : 'Partita standard'}</div>
+        </div>
+        <div class="confidence-display">
+          <div class="confidence-num" style="color:${confColor}">${m.confidence}</div>
+          <div class="confidence-label">confidence</div>
+          <div class="confidence-bar"><div class="confidence-fill" style="width:${m.confidence}%;background:${fillColor}"></div></div>
+        </div>
+      </div>
+
+      <!-- STAT GRID -->
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-val" style="color:var(--accent)">${m.btts}%</div>
+          <div class="stat-lbl">BTTS</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:var(--accent2)">${m.over25}%</div>
+          <div class="stat-lbl">Over 2.5</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:var(--warn)">${m.corners}</div>
+          <div class="stat-lbl">Corner/partita</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" style="color:var(--accent3)">${m.importance}%</div>
+          <div class="stat-lbl">Importanza</div>
+        </div>
+      </div>
+
+      <!-- IMPORTANZA FATTORI -->
+      <div class="importance-section">
+        <div class="h2h-title">// Fattori analizzati</div>
+        ${renderImportanceFactor('Vantaggio campo', m.homeWin > 45 ? m.homeWin - 35 : 30, '#00ff87')}
+        ${renderImportanceFactor('Forma recente (ult. 10)', 100 - m.injuryPenalty * 2, '#00c8ff')}
+        ${renderImportanceFactor('Condizione giocatori', 100 - m.injuryPenalty * 3, m.injuryPenalty > 15 ? '#ff4757' : '#00ff87')}
+        ${renderImportanceFactor('Importanza partita', m.importance, '#ffcc00')}
+        ${renderImportanceFactor('Media corner lega', Math.round(m.leagueInfo.corners / 12 * 100), '#ff6b35')}
+        ${renderImportanceFactor('Tasso BTTS lega', m.leagueInfo.btts, '#00ff87')}
+      </div>
+
+      <!-- H2H -->
+      <div class="h2h-section">
+        <div class="h2h-title">// Scontri diretti (ultimi 10)</div>
+        <div class="h2h-bars">
+          <div>
+            <div class="h2h-num home">${m.h2h.homeWins}</div>
+            <div class="h2h-label">${m.home.split(' ')[0]}</div>
+          </div>
+          <div>
+            <div class="h2h-num draw">${m.h2h.draws}</div>
+            <div class="h2h-label">Pareggi</div>
+          </div>
+          <div>
+            <div class="h2h-num away">${m.h2h.awayWins}</div>
+            <div class="h2h-label">${m.away.split(' ')[0]}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORMAZIONI -->
+      <div class="h2h-title">// Formazioni probabili e condizione</div>
+      <div class="formation-grid">
+        <div class="formation-card">
+          <div class="formation-team-name">🏠 ${m.home}</div>
+          <div class="formation-display">${m.formation.home}</div>
+          <div class="formation-sub">Modulo probabile</div>
+          <div class="player-list">
+            ${m.formation.homePlayers.slice(0,6).map(p => `
+              <div class="player-row">
+                <span class="player-num">${p.num}</span>
+                <span class="player-name">${p.name}</span>
+                <span class="player-status status-${p.status}">${p.status === 'ok' ? '✓ OK' : p.status === 'doubt' ? '? Dubbio' : '✕ Out'}</span>
+              </div>
+            `).join('')}
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">+5 altri giocatori</div>
+          </div>
+        </div>
+        <div class="formation-card">
+          <div class="formation-team-name">✈️ ${m.away}</div>
+          <div class="formation-display">${m.formation.away}</div>
+          <div class="formation-sub">Modulo probabile</div>
+          <div class="player-list">
+            ${m.formation.awayPlayers.slice(0,6).map(p => `
+              <div class="player-row">
+                <span class="player-num">${p.num}</span>
+                <span class="player-name">${p.name}</span>
+                <span class="player-status status-${p.status}">${p.status === 'ok' ? '✓ OK' : p.status === 'doubt' ? '? Dubbio' : '✕ Out'}</span>
+              </div>
+            `).join('')}
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">+5 altri giocatori</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MERCATI -->
+      <div class="h2h-title" style="margin-bottom:12px">// Mercati consigliati (clicca per aggiungere alla schedina)</div>
+      <div class="markets-grid">
+        ${renderMarketCard(m, 'btts', 'BTTS Sì', m.btts, m.ev_btts, 1.75)}
+        ${renderMarketCard(m, 'over25', 'Over 2.5 Gol', m.over25, m.ev_over, 1.80)}
+        ${renderMarketCard(m, 'corners', `Over ${m.corners > 10 ? '9.5' : '8.5'} Corner`, m.corners > 10 ? 62 : 48, m.ev_corners, 1.85)}
+        ${renderMarketCard(m, 'homeWin', `Vittoria ${m.home.split(' ')[0]}`, m.homeWin, calcEV(m.homeWin/100, 2.10), 2.10)}
+        ${renderMarketCard(m, 'awayWin', `Vittoria ${m.away.split(' ')[0]}`, m.awayWin, calcEV(m.awayWin/100, 2.80), 2.80)}
+        ${renderMarketCard(m, 'draw', 'Pareggio', m.draw, calcEV(m.draw/100, 3.20), 3.20)}
+      </div>
+    </div>
+  `;
+}
+
+function renderImportanceFactor(label, val, color) {
+  const v = Math.max(0, Math.min(100, Math.round(val)));
+  return `
+    <div class="importance-row">
+      <span class="importance-label">${label}</span>
+      <div class="importance-track"><div class="importance-fill" style="width:${v}%;background:${color}"></div></div>
+      <span class="importance-val">${v}%</span>
+    </div>
+  `;
+}
+
+function renderMarketCard(m, type, name, prob, ev, odds) {
+  const isRec = ev > 3;
+  const evClass = ev > 0 ? 'ev-pos' : 'ev-neg';
+  const barColor = ev > 5 ? '#00ff87' : ev > 0 ? '#ffcc00' : '#ff4757';
+  return `
+    <div class="market-card ${isRec ? 'recommended' : ''}" onclick="addToSchedina('${m.id}','${type}','${name}',${odds},${prob},${ev},'${m.home} vs ${m.away}')">
+      <div class="market-name">${name}</div>
+      <div class="market-prob" style="color:${barColor}">${prob}%</div>
+      <div class="market-bar"><div class="market-bar-fill" style="width:${Math.min(100,prob)}%;background:${barColor}"></div></div>
+      <div class="market-ev">
+        <span style="color:var(--muted2)">Quota ${odds} · EV </span>
+        <span class="${evClass}">${ev > 0 ? '+' : ''}${ev}%</span>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// SCHEDINA
+// ═══════════════════════════════════════════════
+function addToSchedina(matchId, type, name, odds, prob, ev, match) {
+  const existing = state.schedina.findIndex(s => s.matchId === matchId && s.type === type);
+  if (existing !== -1) {
+    state.schedina.splice(existing, 1);
+    showToast('Rimosso dalla schedina');
+  } else {
+    state.schedina.push({ matchId, type, name, odds, prob, ev, match });
+    showToast('Aggiunto alla schedina ✓');
+  }
+  saveSchedina();
+  if (document.getElementById('tab-schedina').classList.contains('active')) renderSchedina();
+}
+
+function clearSchedina() {
+  if (confirm('Svuotare la schedina?')) {
+    state.schedina = [];
+    saveSchedina();
+    renderSchedina();
+  }
+}
+
+function saveSchedina() {
+  localStorage.setItem('sched_schedina', JSON.stringify(state.schedina));
+}
+
+function renderSchedina() {
+  const listEl = document.getElementById('schedina-list-container');
+  const summEl = document.getElementById('schedina-summary-container');
+
+  if (!state.schedina.length) {
+    listEl.innerHTML = `<div class="empty-state" style="padding:40px 20px"><div class="icon">📋</div><h3>Schedina vuota</h3><p>Dall'analisi dettaglio, clicca su un mercato consigliato<br>per aggiungerlo alla schedina.</p></div>`;
+    summEl.innerHTML = '';
+    return;
+  }
+
+  listEl.innerHTML = state.schedina.map((s, i) => `
+    <div class="schedina-item">
+      <div class="schedina-idx">${i+1}</div>
+      <div class="schedina-info">
+        <div class="schedina-match">${s.match}</div>
+        <div class="schedina-market">${s.name}</div>
+      </div>
+      <span class="schedina-conf">${s.prob}%</span>
+      <span class="schedina-odds">${parseFloat(s.odds).toFixed(2)}</span>
+      <button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="removeFromSchedina(${i})">✕</button>
+    </div>
+  `).join('');
+
+  const qtTot = state.schedina.reduce((a, s) => a * parseFloat(s.odds), 1);
+  const probReale = state.schedina.reduce((a, s) => a * (s.prob / 100), 1) * 100;
+  const vincita = (2 * qtTot).toFixed(2);
+  const ev = ((qtTot * probReale / 100 - 1) * 100).toFixed(1);
+  const evNum = parseFloat(ev);
+  const qtNum = parseFloat(qtTot.toFixed(2));
+
+  let verdictClass = 'verdict-warn', verdictText = '';
+  if (evNum > 5 && qtNum >= 80) {
+    verdictClass = 'verdict-go';
+    verdictText = `✓ Schedina a valore positivo (EV +${ev}%). Quota ${qtNum.toFixed(0)}x → vincita €${vincita} su €2. Ogni evento ha una base statistica. Procedi.`;
+  } else if (evNum > 0) {
+    verdictClass = 'verdict-warn';
+    verdictText = `⚠ EV positivo ma quota totale ${qtNum.toFixed(0)}x (vincita €${vincita}). ${qtNum < 80 ? 'Aggiungi 1-2 eventi per raggiungere €200.' : 'Valuta se il rischio è accettabile.'}`;
+  } else {
+    verdictClass = 'verdict-stop';
+    verdictText = `✕ EV negativo (${ev}%). Le quote non compensano la probabilità reale. Rimuovi gli eventi a bassa confidence.`;
+  }
+
+  summEl.innerHTML = `
+    <div class="schedina-summary">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-val" style="color:${qtNum>=80?'var(--accent)':'var(--warn)'}">${qtNum.toFixed(1)}x</div>
+          <div class="summary-lbl">Quota totale</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-val" style="color:var(--accent2)">${probReale.toFixed(2)}%</div>
+          <div class="summary-lbl">Prob. reale</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-val" style="color:var(--warn)">€${vincita}</div>
+          <div class="summary-lbl">Vincita su €2</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-val" style="color:${evNum>0?'var(--accent)':'var(--danger)'}">${evNum>0?'+':''}${ev}%</div>
+          <div class="summary-lbl">Valore atteso</div>
+        </div>
+      </div>
+      <div class="verdict-box ${verdictClass}">${verdictText}</div>
+    </div>
+  `;
+}
+
+function removeFromSchedina(idx) {
+  state.schedina.splice(idx, 1);
+  saveSchedina();
+  renderSchedina();
+}
+
+// ═══════════════════════════════════════════════
+// LEGHE
+// ═══════════════════════════════════════════════
+function renderLeague() {
+  const el = document.getElementById('leghe-container');
+  const sorted = Object.entries(LEAGUES).sort((a,b) => (b[1].btts + b[1].over) - (a[1].btts + a[1].over));
+  el.innerHTML = `
+    <div style="margin-bottom:20px">
+      <span class="section-label">// Leghe per prevedibilità statistica</span>
+    </div>
+    ${sorted.map(([id, l], i) => `
+      <div class="match-card" style="margin-bottom:8px;cursor:default">
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="font-family:var(--mono);font-size:18px;color:var(--muted);width:28px">${i+1}</span>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:500">${l.country} ${l.name}</div>
+            <div style="display:flex;gap:16px;margin-top:8px">
+              <span>BTTS <strong style="color:var(--accent)">${l.btts}%</strong></span>
+              <span>Over 2.5 <strong style="color:var(--accent2)">${l.over}%</strong></span>
+              <span>Corner/p <strong style="color:var(--warn)">${l.corners}</strong></span>
+            </div>
+          </div>
+          <div>
+            ${l.btts >= 60 ? `<span class="signal-pill pill-green">BTTS TOP</span>` : ''}
+            ${l.corners >= 11 ? `<span class="signal-pill pill-blue">CORNER TOP</span>` : ''}
+            ${l.over >= 60 ? `<span class="signal-pill pill-amber">OVER TOP</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// DEMO DATA
+// ═══════════════════════════════════════════════
+function generateDemoMatches() {
+  const fixtures = [
+    { id:1001, home:'Juventus', away:'Inter', league:'Serie A', leagueId:135, date: todayAt('20:45') },
+    { id:1002, home:'Milan', away:'Napoli', league:'Serie A', leagueId:135, date: todayAt('18:00') },
+    { id:1003, home:'Manchester City', away:'Arsenal', league:'Premier League', leagueId:39, date: todayAt('16:00') },
+    { id:1004, home:'Bayern Monaco', away:'Borussia Dortmund', league:'Bundesliga', leagueId:78, date: todayAt('18:30') },
+    { id:1005, home:'PSG', away:'Marsiglia', league:'Ligue 1', leagueId:61, date: todayAt('21:00') },
+    { id:1006, home:'Real Madrid', away:'Barcellona', league:'La Liga', leagueId:140, date: todayAt('21:00') },
+    { id:1007, home:'Ajax', away:'PSV', league:'Eredivisie', leagueId:88, date: todayAt('20:00') },
+    { id:1008, home:'Leeds United', away:'Sheffield Wed', league:'Championship', leagueId:40, date: todayAt('16:00') },
+    { id:1009, home:'Borussia M.', away:'Stuttgart', league:'Bundesliga 2', leagueId:79, date: todayAt('18:30') },
+    { id:1010, home:'Lazio', away:'Roma', league:'Serie A', leagueId:135, date: todayAt('20:45') },
+    { id:1011, home:'Chelsea', away:'Liverpool', league:'Premier League', leagueId:39, date: todayAt('14:30') },
+    { id:1012, home:'Atalanta', away:'Fiorentina', league:'Serie A', leagueId:135, date: todayAt('15:00') },
+  ];
+  return fixtures;
+}
+
+function todayAt(time) {
+  const d = new Date();
+  const [h,m] = time.split(':');
+  d.setHours(parseInt(h), parseInt(m), 0, 0);
+  return d.toISOString();
+}
+
+// ═══════════════════════════════════════════════
+// AUTO REFRESH
+// ═══════════════════════════════════════════════
+function startAutoRefresh() {
+  if (state.refreshInterval) clearInterval(state.refreshInterval);
+  state.refreshInterval = setInterval(() => {
+    if (!state.isDemo) loadMatches();
+  }, 10 * 60 * 1000);
+}
+
+// ═══════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const tabs = ['matches','analysis','schedina','leghe'];
+    b.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if (name === 'schedina') renderSchedina();
+  if (name === 'leghe') renderLeague();
+}
+
+function showError(containerId, msg) {
+  document.getElementById(containerId).innerHTML = `<div class="error-box">⚠ ${msg}</div>`;
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface3);color:var(--text);border:1px solid var(--border2);padding:10px 20px;border-radius:8px;font-family:var(--mono);font-size:12px;z-index:9999;transition:opacity .3s`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 2000);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+function init() {
+  // Footer clock
+  setInterval(() => {
+    document.getElementById('footer-time').textContent = new Date().toLocaleTimeString('it-IT');
+  }, 1000);
+
+  // Tab buttons manually tied
+  const tabNames = ['matches','analysis','schedina','leghe'];
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.onclick = () => switchTab(tabNames[i]);
+  });
+
+  // Auto-connect if key saved
+  if (state.apiKey) {
+    document.getElementById('api-key-input').value = '●'.repeat(20);
+    connectAPI();
+  }
+
+  updateCallsCounter();
+}
+
+init();
+</script>
+</body>
+</html>

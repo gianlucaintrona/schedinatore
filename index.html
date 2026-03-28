@@ -911,30 +911,37 @@ async function apiCall(endpoint, params = {}) {
     showError('matches-container', 'Limite giornaliero API quasi raggiunto (95/100). Riprova domani.');
     return null;
   }
-  const url = new URL(`https://v3.football.api-sports.io/${endpoint}`);
-  Object.entries(params).forEach(([k,v]) => url.searchParams.append(k, v));
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-apisports-key': state.apiKey
-      }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.errors && Object.keys(data.errors).length > 0) {
-      console.error('API error:', data.errors);
-      return null;
+  // Build target URL
+  const target = new URL(`https://v3.football.api-sports.io/${endpoint}`);
+  Object.entries(params).forEach(([k,v]) => target.searchParams.append(k, v));
+  // Prova prima diretto (funziona se api-sports ha CORS abilitato per browser)
+  // Fallback su corsproxy.io
+  const proxies = [
+    target.toString(),
+    `https://corsproxy.io/?${encodeURIComponent(target.toString())}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(target.toString())}`
+  ];
+  for (const proxyUrl of proxies) {
+    try {
+      const res = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: { 'x-apisports-key': state.apiKey }
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.errors && Object.keys(data.errors).length > 0) { console.error('API error:', data.errors); continue; }
+      if (!data.response) continue;
+      state.callsToday++;
+      localStorage.setItem('sched_calls', state.callsToday);
+      localStorage.setItem('sched_calldate', state.lastCallDate);
+      updateCallsCounter();
+      return data.response;
+    } catch(e) {
+      console.warn('Proxy failed, trying next:', proxyUrl, e.message);
     }
-    state.callsToday++;
-    localStorage.setItem('sched_calls', state.callsToday);
-    localStorage.setItem('sched_calldate', state.lastCallDate);
-    updateCallsCounter();
-    return data.response;
-  } catch(e) {
-    console.error(e);
-    return null;
   }
+  console.error('Tutti i proxy falliti');
+  return null;
 }
 
 // ═══════════════════════════════════════════════
